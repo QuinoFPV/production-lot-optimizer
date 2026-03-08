@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Production Lot Optimizer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --pri: #1e40af; --priL: #3b82f6; --sec: #059669; --secL: #34d399;
+  --warn: #d97706; --warnL: #fbbf24; --danger: #dc2626; --dangerL: #f87171;
+  --purple: #7c3aed; --cyan: #0891b2;
+  --gray: #6b7280; --grayL: #e5e7eb; --grayLL: #f1f5f9;
+  --bg: #f8fafc; --card: #fff; --txt: #1e293b; --txtS: #64748b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--txt); }
+.header { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1d4ed8 100%); padding: 22px 28px; color: white; }
+.header h1 { font-size: 21px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+.container { max-width: 1440px; margin: 0 auto; padding: 0; }
+.tabs { display: flex; gap: 2px; background: var(--card); border-bottom: 1px solid var(--grayL); padding: 0 16px; overflow-x: auto; position: sticky; top: 0; z-index: 10; }
+.tab { padding: 12px 18px; border: none; border-bottom: 3px solid transparent; background: transparent; color: var(--txtS); font-weight: 500; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+.tab.active { color: var(--pri); border-bottom-color: var(--pri); font-weight: 700; }
+.tab:hover { color: var(--pri); }
+.content { padding: 20px; }
+.card { background: var(--card); border-radius: 12px; padding: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); border: 1px solid var(--grayL); margin-bottom: 20px; }
+.card-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.card-sub { font-size: 13px; color: var(--txtS); margin-bottom: 16px; }
+.kpis { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 22px; }
+.kpi { background: var(--card); border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); border: 1px solid var(--grayL); flex: 1 1 180px; min-width: 180px; }
+.kpi-label { font-size: 12px; color: var(--txtS); font-weight: 500; margin-bottom: 4px; }
+.kpi-value { font-size: 22px; font-weight: 700; }
+.kpi-sub { font-size: 11px; color: var(--txtS); margin-top: 2px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 10px 12px; text-align: left; font-weight: 600; color: var(--txtS); font-size: 12px; border-bottom: 2px solid var(--grayL); white-space: nowrap; background: var(--grayLL); }
+td { padding: 9px 12px; border-bottom: 1px solid var(--grayL); }
+tr:hover { background: #f0f4ff; }
+.input, select, input[type="number"], input[type="text"] {
+  padding: 7px 10px; border-radius: 6px; border: 1px solid var(--grayL); font-size: 13px; font-family: inherit; width: 100%;
+}
+input[type="number"] { width: 90px; }
+select { width: auto; min-width: 100px; }
+.btn { padding: 9px 18px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.btn-pri { background: var(--pri); color: white; }
+.btn-pri:hover { background: #1e3a8a; }
+.btn-sec { background: var(--sec); color: white; }
+.btn-sec:hover { background: #047857; }
+.btn-warn { background: var(--warn); color: white; }
+.btn-danger { background: var(--danger); color: white; }
+.btn-outline { background: transparent; border: 1px solid var(--grayL); color: var(--txt); }
+.btn-outline:hover { background: var(--grayLL); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-mts { background: #3b82f618; color: #3b82f6; }
+.badge-mto { background: #f59e0b18; color: #f59e0b; }
+.badge-ss { background: #10b98118; color: #10b981; }
+.badge-promo { background: #ef444418; color: #ef4444; }
+.badge-a { background: #05966918; color: #059669; }
+.badge-b { background: #d9770618; color: #d97706; }
+.badge-c { background: #dc262618; color: #dc2626; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.flex-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.chart-box { position: relative; height: 320px; }
+.section { display: none; }
+.section.active { display: block; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--txtS); margin-bottom: 4px; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.modal { background: white; border-radius: 14px; padding: 28px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+.modal h3 { font-size: 18px; margin-bottom: 16px; }
+.utilization-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+.util-prod { background: var(--priL); }
+.util-co { background: var(--warnL); }
+.util-idle { background: var(--grayL); }
+.seq-block { display: inline-flex; flex-direction: column; padding: 8px 10px; border-radius: 6px; font-size: 11px; min-width: 90px; margin: 2px; }
+.seq-co { display: inline-flex; align-items: center; justify-content: center; width: 22px; font-size: 9px; color: var(--warn); font-weight: 700; }
+.hidden { display: none; }
+.import-area { border: 2px dashed var(--grayL); border-radius: 10px; padding: 30px; text-align: center; color: var(--txtS); cursor: pointer; transition: all 0.2s; }
+.import-area:hover { border-color: var(--priL); background: #eff6ff; }
+.slider-container { display: flex; align-items: center; gap: 12px; }
+.slider-container input[type="range"] { width: 250px; }
+.slider-value { font-size: 20px; font-weight: 700; min-width: 70px; }
+.alert { padding: 10px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 10px; }
+.alert-warn { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+.alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.alert-ok { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.tfoot td { font-weight: 700; background: #dbeafe; }
+.editable { cursor: pointer; border-bottom: 1px dashed var(--grayL); }
+.editable:hover { background: #eff6ff; }
+@media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+.csv-help { background: var(--grayLL); border-radius: 8px; padding: 14px; font-size: 12px; color: var(--txtS); margin: 12px 0; }
+.csv-help code { background: #e2e8f0; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="container">
+    <h1><span style="font-size:26px">&#9881;&#65039;</span> Production Lot Optimizer</h1>
+    <p>Ottimizzazione lotti di produzione &mdash; Prodotti medicali incontinenza</p>
+  </div>
+</div>
+
+<div class="container">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="setup">&#9881;&#65039; Setup Dati</button>
+    <button class="tab" data-tab="optimize">&#128640; Ottimizzazione</button>
+    <button class="tab" data-tab="sequence">&#128197; Sequenza Prod.</button>
+    <button class="tab" data-tab="analysis">&#128202; Analisi Costi</button>
+    <button class="tab" data-tab="whatif">&#128302; What-If</button>
+  </div>
+
+  <div class="content" id="app-content"></div>
+</div>
+
+<!-- Modal container -->
+<div id="modal-root"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const STATE = {
+  lines: [
+    { id:"L1", name:"Linea Pannoloni", speedPcsMin:450, oee:0.82, plannedHoursDay:16, daysWeek:5, scrapRate:0.025 },
+    { id:"L2", name:"Linea Mutandine", speedPcsMin:320, oee:0.78, plannedHoursDay:16, daysWeek:5, scrapRate:0.030 },
+    { id:"L3", name:"Linea Traverse/Inserti", speedPcsMin:550, oee:0.85, plannedHoursDay:16, daysWeek:5, scrapRate:0.020 },
+  ],
+  products: [
+    { id:"PAN-S-D", name:"Pannolone Giorno S", line:"L1", logic:"MTS", family:"PAN-D", demandMonth:65000, ssTarget:14, unitCost:0.32, holdingRate:0.22, changeoverMin:45, changeoverCost:280, priority:2 },
+    { id:"PAN-M-D", name:"Pannolone Giorno M", line:"L1", logic:"MTS", family:"PAN-D", demandMonth:135000, ssTarget:14, unitCost:0.35, holdingRate:0.22, changeoverMin:25, changeoverCost:160, priority:1 },
+    { id:"PAN-L-D", name:"Pannolone Giorno L", line:"L1", logic:"MTS", family:"PAN-D", demandMonth:125000, ssTarget:14, unitCost:0.38, holdingRate:0.22, changeoverMin:25, changeoverCost:160, priority:1 },
+    { id:"PAN-XL-D", name:"Pannolone Giorno XL", line:"L1", logic:"SS", family:"PAN-D", demandMonth:55000, ssTarget:21, unitCost:0.42, holdingRate:0.22, changeoverMin:45, changeoverCost:280, priority:2 },
+    { id:"PAN-M-N", name:"Pannolone Notte M", line:"L1", logic:"MTS", family:"PAN-N", demandMonth:72000, ssTarget:14, unitCost:0.48, holdingRate:0.22, changeoverMin:60, changeoverCost:380, priority:1 },
+    { id:"PAN-L-N", name:"Pannolone Notte L", line:"L1", logic:"MTS", family:"PAN-N", demandMonth:68000, ssTarget:14, unitCost:0.52, holdingRate:0.22, changeoverMin:35, changeoverCost:220, priority:1 },
+    { id:"MUT-M", name:"Mutandina M", line:"L2", logic:"MTS", family:"MUT", demandMonth:85000, ssTarget:14, unitCost:0.55, holdingRate:0.22, changeoverMin:50, changeoverCost:320, priority:1 },
+    { id:"MUT-L", name:"Mutandina L", line:"L2", logic:"MTS", family:"MUT", demandMonth:78000, ssTarget:14, unitCost:0.58, holdingRate:0.22, changeoverMin:30, changeoverCost:200, priority:1 },
+    { id:"MUT-XL", name:"Mutandina XL", line:"L2", logic:"SS", family:"MUT", demandMonth:42000, ssTarget:21, unitCost:0.62, holdingRate:0.22, changeoverMin:50, changeoverCost:320, priority:2 },
+    { id:"MUT-PROMO", name:"Mutandina Promo Estate", line:"L2", logic:"Promo", family:"MUT", demandMonth:30000, ssTarget:0, unitCost:0.50, holdingRate:0.22, changeoverMin:50, changeoverCost:320, priority:3 },
+    { id:"TRV-60", name:"Traversa 60x90", line:"L3", logic:"MTS", family:"TRV", demandMonth:110000, ssTarget:10, unitCost:0.18, holdingRate:0.22, changeoverMin:20, changeoverCost:120, priority:1 },
+    { id:"TRV-80", name:"Traversa 80x180", line:"L3", logic:"MTS", family:"TRV", demandMonth:85000, ssTarget:10, unitCost:0.28, holdingRate:0.22, changeoverMin:30, changeoverCost:180, priority:1 },
+    { id:"INS-N", name:"Inserto Normal", line:"L3", logic:"MTS", family:"INS", demandMonth:95000, ssTarget:10, unitCost:0.15, holdingRate:0.22, changeoverMin:40, changeoverCost:250, priority:2 },
+    { id:"INS-M", name:"Inserto Maxi", line:"L3", logic:"SS", family:"INS", demandMonth:60000, ssTarget:21, unitCost:0.22, holdingRate:0.22, changeoverMin:40, changeoverCost:250, priority:2 },
+    { id:"PAN-MTO1", name:"Pannolone Custom RSA", line:"L1", logic:"MTO", family:"CUSTOM", demandMonth:25000, ssTarget:0, unitCost:0.55, holdingRate:0.22, changeoverMin:90, changeoverCost:550, priority:3 },
+  ],
+  optimized: [],
+  sequences: [],
+  scenarioMultiplier: 1.0,
+  savedScenario: null,
+  activeTab: "setup",
+  charts: {},
+};
+
+// ============================================================
+// OPTIMIZATION ENGINE
+// ============================================================
+function optimizeLots(products, lines) {
+  return products.map(p => {
+    const line = lines.find(l => l.id === p.line);
+    if (!line) return { ...p, optimalLot: 0, error: "Linea non trovata" };
+    const effSpeed = line.speedPcsMin * line.oee * (1 - line.scrapRate);
+    const capMonth = effSpeed * 60 * line.plannedHoursDay * line.daysWeek * 4.33;
+    const demDay = p.demandMonth / (line.daysWeek * 4.33);
+    const D = p.demandMonth * 12;
+    const S = p.changeoverCost + (p.changeoverMin / 60) * effSpeed * p.unitCost * line.scrapRate;
+    const H = p.unitCost * p.holdingRate;
+    const prodRate = effSpeed * 60 * line.plannedHoursDay * line.daysWeek * 4.33 * 12;
+    const dOverP = Math.min(D / prodRate, 0.95);
+    const ebq = Math.round(Math.sqrt((2 * D * S) / (H * (1 - dOverP))));
+    const ssQty = Math.round(demDay * p.ssTarget);
+    const minLot = p.logic === "MTO" ? Math.round(p.demandMonth) : Math.round(demDay * 3);
+    const maxLot = Math.round(p.demandMonth * 2);
+    let optLot = Math.max(minLot, Math.min(ebq, maxLot));
+    if (p.logic === "Promo") optLot = p.demandMonth;
+    else if (p.logic === "MTO") optLot = Math.round(p.demandMonth * 1.02);
+    else if (p.logic === "SS") optLot = Math.max(optLot, ssQty);
+    const prodTimeHrs = (optLot / effSpeed) / 60;
+    const lotsPerMonth = Math.max(1, Math.ceil(p.demandMonth / optLot));
+    const totalCOMonth = lotsPerMonth * p.changeoverMin;
+    const daysInv = optLot / demDay;
+    const avgInv = optLot / 2 + ssQty;
+    const avgInvCost = avgInv * p.unitCost;
+    const annHolding = avgInvCost * p.holdingRate;
+    const annSetup = lotsPerMonth * 12 * p.changeoverCost;
+    const scrapPerLot = Math.round(optLot * line.scrapRate / (1 - line.scrapRate));
+    const util = (p.demandMonth / capMonth) * 100;
+    return {
+      ...p, lineName: line.name, effSpeed: Math.round(effSpeed), capMonth: Math.round(capMonth),
+      optimalLot: optLot, ebq, prodTimeHrs: Math.round(prodTimeHrs * 10) / 10,
+      lotsPerMonth, totalCOMonth, daysInv: Math.round(daysInv), avgInv: Math.round(avgInv),
+      avgInvCost: Math.round(avgInvCost), annHolding: Math.round(annHolding), annSetup: Math.round(annSetup),
+      totalAnnCost: Math.round(annHolding + annSetup), scrapPerLot, ssQty, util: Math.round(util * 10) / 10,
+      demDay: Math.round(demDay),
+    };
+  });
+}
+
+function buildSequences(optimized, lines) {
+  return lines.map(line => {
+    const lp = optimized.filter(p => p.line === line.id);
+    if (!lp.length) return { line, sequence: [], stats: {} };
+    const families = [...new Set(lp.map(p => p.family))];
+    const sorted = [];
+    families.forEach(f => { sorted.push(...lp.filter(p => p.family === f).sort((a, b) => a.priority - b.priority)); });
+    const totalDem = lp.reduce((s, p) => s + p.demandMonth, 0);
+    const totalCO = lp.reduce((s, p) => s + p.totalCOMonth, 0);
+    const totalProdHrs = lp.reduce((s, p) => s + (p.demandMonth / p.effSpeed / 60), 0);
+    const availHrs = line.plannedHoursDay * line.daysWeek * 4.33;
+    const coHrs = totalCO / 60;
+    const netUtil = ((totalProdHrs + coHrs) / availHrs) * 100;
+    const prodUtil = (totalProdHrs / availHrs) * 100;
+    const coPct = (coHrs / availHrs) * 100;
+    const idlePct = Math.max(0, 100 - netUtil);
+    return { line, sequence: sorted, stats: { totalDem, totalCO, totalProdHrs: Math.round(totalProdHrs), availHrs: Math.round(availHrs), coHrs: Math.round(coHrs), netUtil: r1(netUtil), prodUtil: r1(prodUtil), coPct: r1(coPct), idlePct: r1(idlePct), count: lp.length } };
+  });
+}
+
+function runOptimization() {
+  const prods = STATE.products.map(p => ({ ...p, demandMonth: Math.round(p.demandMonth * STATE.scenarioMultiplier) }));
+  STATE.optimized = optimizeLots(prods, STATE.lines);
+  STATE.sequences = buildSequences(STATE.optimized, STATE.lines);
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+const fmt = n => typeof n === "number" ? n.toLocaleString("it-IT") : n;
+const fmtK = n => n >= 1e6 ? (n/1e6).toFixed(1)+"M" : n >= 1000 ? (n/1000).toFixed(1)+"K" : fmt(n);
+const fmtE = n => "\u20ac" + fmtK(n);
+const r1 = n => Math.round(n * 10) / 10;
+const $ = id => document.getElementById(id);
+const logicBadge = l => `<span class="badge badge-${l.toLowerCase()}">${l}</span>`;
+const FCOLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#f97316"];
+
+function destroyChart(key) { if (STATE.charts[key]) { STATE.charts[key].destroy(); delete STATE.charts[key]; } }
+
+// ============================================================
+// TAB NAVIGATION
+// ============================================================
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.activeTab = btn.dataset.tab;
+    render();
+  });
+});
+
+// ============================================================
+// MODAL
+// ============================================================
+function showModal(html) {
+  $('modal-root').innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`;
+}
+function closeModal() { $('modal-root').innerHTML = ''; }
+
+// ============================================================
+// RENDER
+// ============================================================
+function render() {
+  runOptimization();
+  const el = $('app-content');
+  switch (STATE.activeTab) {
+    case 'setup': renderSetup(el); break;
+    case 'optimize': renderOptimize(el); break;
+    case 'sequence': renderSequence(el); break;
+    case 'analysis': renderAnalysis(el); break;
+    case 'whatif': renderWhatIf(el); break;
+  }
+}
+
+// ============================================================
+// SETUP TAB
+// ============================================================
+function renderSetup(el) {
+  el.innerHTML = `
+    <!-- LINES -->
+    <div class="card">
+      <div class="flex-between">
+        <div><div class="card-title">&#128268; Linee di Produzione</div><div class="card-sub">Clicca su una cella per modificare i parametri. Capacit&agrave; = Velocit&agrave; &times; OEE &times; (1-Scarto) &times; Ore &times; GG &times; 4.33</div></div>
+        <button class="btn btn-pri btn-sm" onclick="showAddLineModal()">+ Aggiungi Linea</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Nome Linea</th><th>Velocit&agrave; (pz/min)</th><th>OEE</th>
+            <th>Ore/GG</th><th>GG/Sett</th><th>Scarto %</th><th>Cap. Eff./Mese</th><th></th>
+          </tr></thead>
+          <tbody id="lines-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="card">
+      <div class="flex-between">
+        <div>
+          <div class="card-title">&#128230; Articoli e Logiche Gestionali</div>
+          <div class="card-sub">Clicca su una riga per modificare. Logiche:
+            <span class="badge badge-mts">MTS</span> Make to Stock &nbsp;
+            <span class="badge badge-mto">MTO</span> Make to Order &nbsp;
+            <span class="badge badge-ss">SS</span> Safety Stock &nbsp;
+            <span class="badge badge-promo">Promo</span> Promozionale
+          </div>
+        </div>
+        <div class="flex-row">
+          <button class="btn btn-pri btn-sm" onclick="showAddProductModal()">+ Aggiungi Articolo</button>
+          <button class="btn btn-outline btn-sm" onclick="showImportModal()">&#128229; Importa CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="exportCSV()">&#128228; Esporta CSV</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Nome</th><th>Linea</th><th>Logica</th><th>Famiglia</th>
+            <th>Domanda/Mese</th><th>SS (gg)</th><th>Costo &euro;</th><th>Holding %</th>
+            <th>C/O (min)</th><th>Costo C/O &euro;</th><th>Prior.</th><th></th>
+          </tr></thead>
+          <tbody id="products-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center; padding:16px">
+      <button class="btn btn-pri" onclick="switchTab('optimize')" style="font-size:15px; padding:12px 32px">
+        &#128640; Lancia Ottimizzazione
+      </button>
+    </div>
+  `;
+  renderLinesTable();
+  renderProductsTable();
+}
+
+function renderLinesTable() {
+  const tbody = $('lines-tbody');
+  tbody.innerHTML = STATE.lines.map(l => {
+    const eff = l.speedPcsMin * l.oee * (1 - l.scrapRate);
+    const cap = Math.round(eff * 60 * l.plannedHoursDay * l.daysWeek * 4.33);
+    return `<tr>
+      <td><strong>${l.id}</strong></td>
+      <td>${editableCell(l.id, 'line', 'name', l.name, 'text')}</td>
+      <td>${editableCell(l.id, 'line', 'speedPcsMin', l.speedPcsMin, 'number')}</td>
+      <td>${editableCell(l.id, 'line', 'oee', (l.oee*100).toFixed(0)+'%', 'oee')}</td>
+      <td>${editableCell(l.id, 'line', 'plannedHoursDay', l.plannedHoursDay, 'number')}</td>
+      <td>${editableCell(l.id, 'line', 'daysWeek', l.daysWeek, 'number')}</td>
+      <td>${editableCell(l.id, 'line', 'scrapRate', (l.scrapRate*100).toFixed(1)+'%', 'pct')}</td>
+      <td style="font-weight:700;color:var(--pri)">${fmt(cap)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteLine('${l.id}')" title="Elimina">&times;</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderProductsTable() {
+  const tbody = $('products-tbody');
+  tbody.innerHTML = STATE.products.map(p => {
+    const lineName = STATE.lines.find(l => l.id === p.line)?.name || p.line;
+    return `<tr>
+      <td><strong>${p.id}</strong></td>
+      <td>${editableCell(p.id, 'prod', 'name', p.name, 'text')}</td>
+      <td>${editableCell(p.id, 'prod', 'line', lineName, 'line-select')}</td>
+      <td>${editableCell(p.id, 'prod', 'logic', p.logic, 'logic-select')}</td>
+      <td>${editableCell(p.id, 'prod', 'family', p.family, 'text')}</td>
+      <td style="font-weight:600">${editableCell(p.id, 'prod', 'demandMonth', fmt(p.demandMonth), 'number-big')}</td>
+      <td>${editableCell(p.id, 'prod', 'ssTarget', p.ssTarget, 'number')}</td>
+      <td>${editableCell(p.id, 'prod', 'unitCost', p.unitCost, 'number-dec')}</td>
+      <td>${editableCell(p.id, 'prod', 'holdingRate', (p.holdingRate*100).toFixed(0)+'%', 'pct')}</td>
+      <td>${editableCell(p.id, 'prod', 'changeoverMin', p.changeoverMin, 'number')}</td>
+      <td>${editableCell(p.id, 'prod', 'changeoverCost', p.changeoverCost, 'number')}</td>
+      <td>${editableCell(p.id, 'prod', 'priority', p.priority, 'number')}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')" title="Elimina">&times;</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function editableCell(itemId, type, field, display, inputType) {
+  const cellId = `${type}-${itemId}-${field}`;
+  return `<span class="editable" id="${cellId}" onclick="startEdit('${cellId}','${itemId}','${type}','${field}','${inputType}')">${inputType==='logic-select' ? logicBadge(display) : display}</span>`;
+}
+
+function startEdit(cellId, itemId, type, field, inputType) {
+  const cell = $(cellId);
+  const item = type === 'line' ? STATE.lines.find(l => l.id === itemId) : STATE.products.find(p => p.id === itemId);
+  let val = item[field];
+  let html = '';
+  if (inputType === 'line-select') {
+    html = `<select onchange="saveEdit('${itemId}','${type}','${field}',this.value)" onblur="render()" autofocus>
+      ${STATE.lines.map(l => `<option value="${l.id}" ${l.id===val?'selected':''}>${l.name}</option>`).join('')}
+    </select>`;
+  } else if (inputType === 'logic-select') {
+    html = `<select onchange="saveEdit('${itemId}','${type}','${field}',this.value)" onblur="render()" autofocus>
+      ${['MTS','MTO','SS','Promo'].map(l => `<option value="${l}" ${l===val?'selected':''}>${l}</option>`).join('')}
+    </select>`;
+  } else if (inputType === 'oee') {
+    html = `<input type="number" step="1" min="0" max="100" value="${Math.round(val*100)}" style="width:60px"
+      onblur="saveEdit('${itemId}','${type}','${field}',this.value/100);render()"
+      onkeydown="if(event.key==='Enter'){saveEdit('${itemId}','${type}','${field}',this.value/100);render()}" autofocus>%`;
+  } else if (inputType === 'pct') {
+    html = `<input type="number" step="0.1" min="0" max="100" value="${(val*100).toFixed(1)}" style="width:60px"
+      onblur="saveEdit('${itemId}','${type}','${field}',this.value/100);render()"
+      onkeydown="if(event.key==='Enter'){saveEdit('${itemId}','${type}','${field}',this.value/100);render()}" autofocus>%`;
+  } else if (inputType === 'number-big') {
+    html = `<input type="number" step="1000" value="${val}" style="width:100px"
+      onblur="saveEdit('${itemId}','${type}','${field}',+this.value);render()"
+      onkeydown="if(event.key==='Enter'){saveEdit('${itemId}','${type}','${field}',+this.value);render()}" autofocus>`;
+  } else if (inputType === 'number-dec') {
+    html = `<input type="number" step="0.01" value="${val}" style="width:70px"
+      onblur="saveEdit('${itemId}','${type}','${field}',+this.value);render()"
+      onkeydown="if(event.key==='Enter'){saveEdit('${itemId}','${type}','${field}',+this.value);render()}" autofocus>`;
+  } else if (inputType === 'number') {
+    html = `<input type="number" value="${val}" style="width:70px"
+      onblur="saveEdit('${itemId}','${type}','${field}',+this.value);render()"
+      onkeydown="if(event.key==='Enter'){saveEdit('${itemId}','${type}','${field}',+this.value);render()}" autofocus>`;
+  } else {
+    html = `<input type="text" value="${val}" style="width:140px"
+      onblur="saveEdit('${itemId}','${type}','${field}',this.value);render()"
+      onkeydown="if(event.key==='Enter'){saveEdit('${itemId}','${type}','${field}',this.value);render()}" autofocus>`;
+  }
+  cell.innerHTML = html;
+  cell.querySelector('input,select')?.focus();
+}
+
+function saveEdit(itemId, type, field, value) {
+  if (type === 'line') {
+    const line = STATE.lines.find(l => l.id === itemId);
+    if (line) line[field] = value;
+  } else {
+    const prod = STATE.products.find(p => p.id === itemId);
+    if (prod) prod[field] = value;
+  }
+}
+
+function deleteLine(id) { if (confirm("Eliminare questa linea?")) { STATE.lines = STATE.lines.filter(l => l.id !== id); render(); } }
+function deleteProduct(id) { if (confirm("Eliminare questo articolo?")) { STATE.products = STATE.products.filter(p => p.id !== id); render(); } }
+
+function showAddLineModal() {
+  showModal(`
+    <h3>Nuova Linea di Produzione</h3>
+    <div class="form-row">
+      <div class="form-group"><label>ID</label><input id="nl-id" value="L${STATE.lines.length+1}"></div>
+      <div class="form-group"><label>Nome</label><input id="nl-name" value="Nuova Linea"></div>
+      <div class="form-group"><label>Velocit&agrave; (pz/min)</label><input type="number" id="nl-speed" value="400"></div>
+      <div class="form-group"><label>OEE (0-1)</label><input type="number" step="0.01" id="nl-oee" value="0.80"></div>
+      <div class="form-group"><label>Ore/Giorno</label><input type="number" id="nl-hours" value="16"></div>
+      <div class="form-group"><label>GG/Settimana</label><input type="number" id="nl-days" value="5"></div>
+      <div class="form-group"><label>Scarto (0-1)</label><input type="number" step="0.001" id="nl-scrap" value="0.025"></div>
+    </div>
+    <div class="flex-row" style="margin-top:16px">
+      <button class="btn btn-pri" onclick="addLine()">Aggiungi</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+  `);
+}
+
+function addLine() {
+  STATE.lines.push({
+    id: $('nl-id').value, name: $('nl-name').value, speedPcsMin: +$('nl-speed').value,
+    oee: +$('nl-oee').value, plannedHoursDay: +$('nl-hours').value,
+    daysWeek: +$('nl-days').value, scrapRate: +$('nl-scrap').value,
+  });
+  closeModal(); render();
+}
+
+function showAddProductModal() {
+  showModal(`
+    <h3>Nuovo Articolo</h3>
+    <div class="form-row">
+      <div class="form-group"><label>ID (codice)</label><input id="np-id" placeholder="SKU-001"></div>
+      <div class="form-group"><label>Nome</label><input id="np-name" placeholder="Descrizione articolo"></div>
+      <div class="form-group"><label>Linea</label><select id="np-line">${STATE.lines.map(l=>`<option value="${l.id}">${l.name}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Logica</label><select id="np-logic"><option>MTS</option><option>MTO</option><option>SS</option><option>Promo</option></select></div>
+      <div class="form-group"><label>Famiglia</label><input id="np-family" placeholder="FAM"></div>
+      <div class="form-group"><label>Domanda/Mese</label><input type="number" id="np-demand" value="50000"></div>
+      <div class="form-group"><label>SS Target (gg)</label><input type="number" id="np-ss" value="14"></div>
+      <div class="form-group"><label>Costo Unitario &euro;</label><input type="number" step="0.01" id="np-cost" value="0.35"></div>
+      <div class="form-group"><label>Holding Rate</label><input type="number" step="0.01" id="np-holding" value="0.22"></div>
+      <div class="form-group"><label>Changeover (min)</label><input type="number" id="np-co" value="45"></div>
+      <div class="form-group"><label>Costo C/O &euro;</label><input type="number" id="np-cocost" value="280"></div>
+      <div class="form-group"><label>Priorit&agrave;</label><input type="number" id="np-pri" value="2"></div>
+    </div>
+    <div class="flex-row" style="margin-top:16px">
+      <button class="btn btn-pri" onclick="addProduct()">Aggiungi</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+  `);
+}
+
+function addProduct() {
+  STATE.products.push({
+    id: $('np-id').value, name: $('np-name').value, line: $('np-line').value,
+    logic: $('np-logic').value, family: $('np-family').value,
+    demandMonth: +$('np-demand').value, ssTarget: +$('np-ss').value,
+    unitCost: +$('np-cost').value, holdingRate: +$('np-holding').value,
+    changeoverMin: +$('np-co').value, changeoverCost: +$('np-cocost').value,
+    priority: +$('np-pri').value,
+  });
+  closeModal(); render();
+}
+
+// CSV Import/Export
+function showImportModal() {
+  showModal(`
+    <h3>&#128229; Importa Articoli da CSV</h3>
+    <div class="csv-help">
+      <strong>Formato CSV richiesto (separatore: punto e virgola o virgola):</strong><br>
+      <code>id;name;line;logic;family;demandMonth;ssTarget;unitCost;holdingRate;changeoverMin;changeoverCost;priority</code><br><br>
+      <strong>Esempio:</strong><br>
+      <code>SKU-001;Pannolone XL;L1;MTS;PAN;80000;14;0.42;0.22;45;280;1</code>
+    </div>
+    <textarea id="csv-input" rows="10" style="width:100%;font-family:monospace;font-size:12px;padding:10px;border-radius:8px;border:1px solid var(--grayL)"
+      placeholder="Incolla qui i dati CSV..."></textarea>
+    <div class="flex-row" style="margin-top:12px">
+      <label class="btn btn-outline btn-sm" style="cursor:pointer">
+        &#128193; Carica File <input type="file" accept=".csv,.txt" style="display:none" onchange="loadCSVFile(this)">
+      </label>
+      <div style="flex:1"></div>
+      <label style="font-size:13px"><input type="checkbox" id="csv-replace"> Sostituisci tutti gli articoli esistenti</label>
+    </div>
+    <div class="flex-row" style="margin-top:16px">
+      <button class="btn btn-pri" onclick="importCSV()">Importa</button>
+      <button class="btn btn-outline" onclick="closeModal()">Annulla</button>
+    </div>
+    <div id="csv-status" style="margin-top:10px"></div>
+  `);
+}
+
+function loadCSVFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { $('csv-input').value = e.target.result; };
+  reader.readAsText(file);
+}
+
+function importCSV() {
+  const raw = $('csv-input').value.trim();
+  if (!raw) return;
+  const sep = raw.includes(';') ? ';' : ',';
+  const rows = raw.split('\n').map(r => r.trim()).filter(Boolean);
+  let startIdx = 0;
+  if (rows[0].toLowerCase().includes('id') && rows[0].toLowerCase().includes('name')) startIdx = 1;
+  const newProducts = [];
+  const errors = [];
+  for (let i = startIdx; i < rows.length; i++) {
+    const cols = rows[i].split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
+    if (cols.length < 12) { errors.push(`Riga ${i+1}: ${cols.length} colonne (servono 12)`); continue; }
+    newProducts.push({
+      id: cols[0], name: cols[1], line: cols[2], logic: cols[3], family: cols[4],
+      demandMonth: +cols[5], ssTarget: +cols[6], unitCost: +cols[7], holdingRate: +cols[8],
+      changeoverMin: +cols[9], changeoverCost: +cols[10], priority: +cols[11],
+    });
+  }
+  if ($('csv-replace').checked) STATE.products = newProducts;
+  else STATE.products.push(...newProducts);
+  const status = $('csv-status');
+  status.innerHTML = `<div class="alert alert-ok">Importati ${newProducts.length} articoli.</div>` +
+    (errors.length ? `<div class="alert alert-warn">${errors.join('<br>')}</div>` : '');
+  setTimeout(() => { closeModal(); render(); }, 1200);
+}
+
+function exportCSV() {
+  const header = 'id;name;line;logic;family;demandMonth;ssTarget;unitCost;holdingRate;changeoverMin;changeoverCost;priority';
+  const rows = STATE.products.map(p => [p.id,p.name,p.line,p.logic,p.family,p.demandMonth,p.ssTarget,p.unitCost,p.holdingRate,p.changeoverMin,p.changeoverCost,p.priority].join(';'));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'articoli_produzione.csv';
+  a.click();
+}
+
+function switchTab(tab) {
+  STATE.activeTab = tab;
+  document.querySelectorAll('.tab').forEach(b => { b.classList.toggle('active', b.dataset.tab === tab); });
+  render();
+}
+
+// ============================================================
+// OPTIMIZE TAB
+// ============================================================
+function renderOptimize(el) {
+  const O = STATE.optimized;
+  const totCost = O.reduce((s,p) => s+p.totalAnnCost, 0);
+  const totCO = O.reduce((s,p) => s+p.totalCOMonth, 0);
+  const avgDI = O.reduce((s,p) => s+p.daysInv, 0) / O.length;
+  const totInvVal = O.reduce((s,p) => s+p.avgInvCost, 0);
+
+  el.innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">Costo Totale Annuo</div><div class="kpi-value">${fmtE(totCost)}</div><div class="kpi-sub">Holding + Setup</div></div>
+      <div class="kpi"><div class="kpi-label">Changeover/Mese</div><div class="kpi-value">${fmt(totCO)}'</div><div class="kpi-sub">${Math.round(totCO/60)} ore</div></div>
+      <div class="kpi"><div class="kpi-label">Inventario Medio</div><div class="kpi-value">${Math.round(avgDI)} gg</div><div class="kpi-sub">${fmtE(totInvVal)}</div></div>
+      <div class="kpi"><div class="kpi-label">Articoli</div><div class="kpi-value">${O.length}</div><div class="kpi-sub">${STATE.lines.length} linee</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Risultati Ottimizzazione Lotti</div>
+      <div class="card-sub">EBQ (Economic Batch Quantity) adattato per logica gestionale &mdash; Risultati ordinati per costo annuo decrescente</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Articolo</th><th>Logica</th><th>Domanda/Mese</th><th>Lotto Ottimale</th><th>EBQ Teorico</th>
+            <th>Lotti/Mese</th><th>Prod. (h)</th><th>C/O Tot (min)</th><th>GG Scorta</th><th>Scarti/Lotto</th><th>Costo Annuo</th>
+          </tr></thead>
+          <tbody>${O.sort((a,b) => b.totalAnnCost - a.totalAnnCost).map(p => `<tr>
+            <td><strong>${p.name}</strong><br><span style="font-size:11px;color:var(--txtS)">${p.id} | ${p.lineName}</span></td>
+            <td>${logicBadge(p.logic)}</td>
+            <td style="font-weight:600">${fmt(p.demandMonth)}</td>
+            <td style="font-weight:700;color:var(--pri)">${fmt(p.optimalLot)}</td>
+            <td style="color:var(--txtS)">${fmt(p.ebq)}</td>
+            <td>${p.lotsPerMonth}</td>
+            <td>${p.prodTimeHrs}</td>
+            <td style="color:${p.totalCOMonth>120?'var(--danger)':'inherit'}">${p.totalCOMonth}'</td>
+            <td><span style="color:${p.daysInv>30?'var(--warn)':'var(--sec)'};font-weight:600">${p.daysInv}</span></td>
+            <td style="color:var(--txtS)">${fmt(p.scrapPerLot)}</td>
+            <td style="font-weight:600">${fmtE(p.totalAnnCost)}</td>
+          </tr>`).join('')}</tbody>
+          <tfoot><tr class="tfoot">
+            <td colspan="7"><strong>TOTALE</strong></td>
+            <td>${fmt(totCO)}'</td><td>${Math.round(avgDI)}</td>
+            <td>${fmt(O.reduce((s,p)=>s+p.scrapPerLot*p.lotsPerMonth,0))}</td>
+            <td><strong>${fmtE(totCost)}</strong></td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><div class="card-title">Lotto Ottimale vs Domanda</div><div class="chart-box"><canvas id="chart-lot-demand"></canvas></div></div>
+      <div class="card"><div class="card-title">Holding vs Setup Cost</div><div class="chart-box"><canvas id="chart-cost-split"></canvas></div></div>
+    </div>
+    <div class="card" style="text-align:center;padding:14px">
+      <button class="btn btn-outline btn-sm" onclick="exportResults()">&#128228; Esporta Risultati CSV</button>
+    </div>
+  `;
+  // Charts
+  const top12 = [...O].sort((a,b) => b.demandMonth - a.demandMonth).slice(0,12);
+  destroyChart('lotDemand');
+  STATE.charts.lotDemand = new Chart($('chart-lot-demand'), {
+    type: 'bar', data: {
+      labels: top12.map(p => p.id),
+      datasets: [
+        { label: 'Domanda/Mese', data: top12.map(p => p.demandMonth), backgroundColor: '#e2e8f0' },
+        { label: 'Lotto Ottimale', data: top12.map(p => p.optimalLot), backgroundColor: '#3b82f6' },
+      ]
+    }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins:{legend:{position:'bottom'}} }
+  });
+  destroyChart('costSplit');
+  STATE.charts.costSplit = new Chart($('chart-cost-split'), {
+    type: 'bar', data: {
+      labels: top12.map(p => p.id),
+      datasets: [
+        { label: 'Holding', data: top12.map(p => p.annHolding), backgroundColor: '#3b82f6' },
+        { label: 'Setup', data: top12.map(p => p.annSetup), backgroundColor: '#fbbf24' },
+      ]
+    }, options: { responsive: true, maintainAspectRatio: false, scales:{x:{stacked:true},y:{stacked:true}}, plugins:{legend:{position:'bottom'}} }
+  });
+}
+
+function exportResults() {
+  const O = STATE.optimized;
+  const h = 'id;name;linea;logica;domandaMese;lottoOttimale;ebq;lottiMese;prodOre;coMinMese;ggScorta;scartilotto;costoAnnuo';
+  const rows = O.map(p => [p.id,p.name,p.lineName,p.logic,p.demandMonth,p.optimalLot,p.ebq,p.lotsPerMonth,p.prodTimeHrs,p.totalCOMonth,p.daysInv,p.scrapPerLot,p.totalAnnCost].join(';'));
+  const blob = new Blob([[h,...rows].join('\n')], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='risultati_ottimizzazione.csv'; a.click();
+}
+
+// ============================================================
+// SEQUENCE TAB
+// ============================================================
+function renderSequence(el) {
+  el.innerHTML = STATE.sequences.map((seq,si) => {
+    const st = seq.stats;
+    if (!seq.sequence.length) return '';
+    const families = [...new Set(seq.sequence.map(p=>p.family))];
+    return `
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:14px">
+        <div>
+          <div class="card-title">${seq.line.name}</div>
+          <div class="card-sub">${st.count} articoli &mdash; Vel. nom. ${seq.line.speedPcsMin} pz/min &mdash; OEE ${(seq.line.oee*100).toFixed(0)}%</div>
+        </div>
+        <div class="flex-row">
+          <span style="padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;
+            background:${st.netUtil>90?'#fee2e2':st.netUtil>75?'#fef3c7':'#d1fae5'};
+            color:${st.netUtil>90?'var(--danger)':st.netUtil>75?'var(--warn)':'var(--sec)'}">
+            Utilizzo: ${st.netUtil}%
+          </span>
+          <span style="padding:6px 14px;border-radius:8px;font-size:12px;background:var(--grayLL)">
+            Prod ${st.prodUtil}% | C/O ${st.coPct}% | Idle ${st.idlePct}%
+          </span>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:var(--txtS);margin-bottom:6px">
+          Sequenza ottimizzata (raggruppamento per famiglia &rarr; min. changeover)
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px;align-items:stretch">
+          ${seq.sequence.map((p,i) => {
+            const fi = families.indexOf(p.family);
+            const color = FCOLORS[fi % FCOLORS.length];
+            return (i>0?`<div class="seq-co" title="C/O ${p.changeoverMin}'">&darr;${p.changeoverMin}'</div>`:'') +
+            `<div class="seq-block" style="background:${color}18;border-left:3px solid ${color}">
+              <strong>${p.id}</strong>
+              <span style="color:var(--txtS)">${fmt(p.optimalLot)} pz</span>
+              <span style="color:var(--txtS)">${p.prodTimeHrs}h + ${p.changeoverMin}'</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--txtS);margin-bottom:4px">Utilizzo Capacit&agrave;</div>
+      <div class="utilization-bar">
+        <div class="util-prod" style="width:${st.prodUtil}%;display:flex;align-items:center;justify-content:center;font-size:11px;color:white;font-weight:600">${st.prodUtil>10?st.prodUtil+'%':''}</div>
+        <div class="util-co" style="width:${st.coPct}%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600">${st.coPct>5?st.coPct+'%':''}</div>
+        <div class="util-idle" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--txtS)">${st.idlePct>5?'Idle '+st.idlePct+'%':''}</div>
+      </div>
+      <div style="margin-top:6px;font-size:12px;display:flex;gap:14px;color:var(--txtS)">
+        <span>&#128309; Produzione ${st.totalProdHrs}h</span>
+        <span>&#128992; Changeover ${st.coHrs}h (${st.totalCO}')</span>
+        <span>&#9898; Idle ${Math.round(st.availHrs - st.totalProdHrs - st.coHrs)}h</span>
+        <span>| Disponibili: ${st.availHrs}h/mese</span>
+      </div>
+      ${st.netUtil > 95 ? '<div class="alert alert-danger" style="margin-top:10px">&#9888;&#65039; Sovraccarico! Considerare turno aggiuntivo o esternalizzazione.</div>' :
+        st.netUtil > 85 ? '<div class="alert alert-warn" style="margin-top:10px">&#9888;&#65039; Utilizzo elevato. Poco margine per imprevisti o manutenzione.</div>' :
+        '<div class="alert alert-ok" style="margin-top:10px">&#9989; Capacit&agrave; adeguata. Margine sufficiente per variabilit&agrave;.</div>'}
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// ANALYSIS TAB
+// ============================================================
+function renderAnalysis(el) {
+  const O = STATE.optimized;
+  const totH = O.reduce((s,p)=>s+p.annHolding,0);
+  const totS = O.reduce((s,p)=>s+p.annSetup,0);
+  const totScrap = O.reduce((s,p)=>s+p.scrapPerLot*p.lotsPerMonth,0);
+  const totInvVal = O.reduce((s,p)=>s+p.avgInvCost,0);
+
+  el.innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">Costo Holding Annuo</div><div class="kpi-value">${fmtE(totH)}</div></div>
+      <div class="kpi"><div class="kpi-label">Costo Setup Annuo</div><div class="kpi-value">${fmtE(totS)}</div></div>
+      <div class="kpi"><div class="kpi-label">Scarti Mensili</div><div class="kpi-value">${fmtK(totScrap)}</div><div class="kpi-sub">pezzi</div></div>
+      <div class="kpi"><div class="kpi-label">Valore Scorta Media</div><div class="kpi-value">${fmtE(totInvVal)}</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><div class="card-title">Costi per Logica Gestionale</div><div class="chart-box"><canvas id="chart-logic-cost"></canvas></div></div>
+      <div class="card"><div class="card-title">Distribuzione Holding vs Setup</div><div class="chart-box"><canvas id="chart-hs-pie"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Giorni Scorta per Articolo e Logica</div>
+      <div class="chart-box" style="height:350px"><canvas id="chart-days-inv"></canvas></div>
+    </div>
+  `;
+
+  // Cost by logic
+  const byLogic = {};
+  O.forEach(p => {
+    if (!byLogic[p.logic]) byLogic[p.logic] = { holding:0, setup:0 };
+    byLogic[p.logic].holding += p.annHolding;
+    byLogic[p.logic].setup += p.annSetup;
+  });
+  const logics = Object.keys(byLogic);
+  destroyChart('logicCost');
+  STATE.charts.logicCost = new Chart($('chart-logic-cost'), {
+    type:'bar', data:{
+      labels: logics,
+      datasets:[
+        { label:'Holding', data: logics.map(l=>byLogic[l].holding), backgroundColor:'#3b82f6' },
+        { label:'Setup', data: logics.map(l=>byLogic[l].setup), backgroundColor:'#fbbf24' },
+      ]
+    }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+  });
+
+  // Pie
+  destroyChart('hsPie');
+  STATE.charts.hsPie = new Chart($('chart-hs-pie'), {
+    type:'doughnut', data:{
+      labels:['Holding','Setup'],
+      datasets:[{data:[totH,totS], backgroundColor:['#3b82f6','#fbbf24']}]
+    }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+  });
+
+  // Days inventory
+  const sorted = [...O].sort((a,b)=>a.logic.localeCompare(b.logic));
+  const logicColorMap = { MTS:'#3b82f6', MTO:'#f59e0b', SS:'#10b981', Promo:'#ef4444' };
+  destroyChart('daysInv');
+  STATE.charts.daysInv = new Chart($('chart-days-inv'), {
+    type:'bar', data:{
+      labels: sorted.map(p=>p.id),
+      datasets:[{
+        label:'GG Scorta',
+        data: sorted.map(p=>p.daysInv),
+        backgroundColor: sorted.map(p=>logicColorMap[p.logic]||'#6b7280'),
+      }]
+    }, options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        annotation:{ annotations:{ line1:{ type:'line', yMin:14, yMax:14, borderColor:'#dc2626', borderWidth:2, borderDash:[5,5] } } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// WHAT-IF TAB
+// ============================================================
+function renderWhatIf(el) {
+  const O = STATE.optimized;
+  const totCost = O.reduce((s,p)=>s+p.totalAnnCost,0);
+  const totCO = O.reduce((s,p)=>s+p.totalCOMonth,0);
+  const avgDI = O.reduce((s,p)=>s+p.daysInv,0)/O.length;
+  const totInv = O.reduce((s,p)=>s+p.avgInvCost,0);
+  const m = STATE.scenarioMultiplier;
+  const saved = STATE.savedScenario;
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">&#128302; Simulatore What-If</div>
+      <div class="card-sub">Modifica la domanda globale e osserva l'impatto sui lotti, costi e capacit&agrave;</div>
+      <div class="flex-between" style="margin:16px 0">
+        <div class="slider-container">
+          <label style="font-weight:600;font-size:13px">Moltiplicatore Domanda:</label>
+          <input type="range" min="0.5" max="2.0" step="0.05" value="${m}" id="wi-slider"
+            oninput="updateScenario(+this.value)">
+          <div class="slider-value" id="wi-label" style="color:${m>1?'var(--sec)':m<1?'var(--danger)':'var(--txt)'}">
+            ${m===1?'Base':(m>1?'+':'')+((m-1)*100).toFixed(0)+'%'}
+          </div>
+        </div>
+        <div class="flex-row">
+          ${[0.7,0.85,1.0,1.15,1.3,1.5].map(v =>
+            `<button class="btn ${m===v?'btn-pri':'btn-outline'} btn-sm" onclick="updateScenario(${v})">${v===1?'Base':(v>1?'+':'')+((v-1)*100).toFixed(0)+'%'}</button>`
+          ).join('')}
+          <button class="btn btn-sec btn-sm" onclick="saveScenario()">Salva Confronto</button>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Costo Totale Annuo</div><div class="kpi-value">${fmtE(totCost)}</div>${saved?`<div class="kpi-sub">Confronto: ${fmtE(saved.totCost)}</div>`:''}</div>
+        <div class="kpi"><div class="kpi-label">Changeover/Mese</div><div class="kpi-value">${fmt(totCO)}'</div>${saved?`<div class="kpi-sub">Confronto: ${fmt(saved.totCO)}'</div>`:''}</div>
+        <div class="kpi"><div class="kpi-label">GG Scorta Medi</div><div class="kpi-value">${Math.round(avgDI)}</div>${saved?`<div class="kpi-sub">Confronto: ${Math.round(saved.avgDI)}</div>`:''}</div>
+        <div class="kpi"><div class="kpi-label">Valore Inventario</div><div class="kpi-value">${fmtE(totInv)}</div>${saved?`<div class="kpi-sub">Confronto: ${fmtE(saved.totInv)}</div>`:''}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Analisi di Sensitivit&agrave;</div>
+      <div class="card-sub">Impatto della variazione di domanda su costi e changeover</div>
+      <div class="chart-box" style="height:360px"><canvas id="chart-sensitivity"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Impatto sulla Capacit&agrave; per Linea</div>
+      ${STATE.sequences.map(seq => {
+        const st = seq.stats;
+        return `<div style="margin-bottom:16px;padding:14px;border:1px solid var(--grayL);border-radius:10px">
+          <div class="flex-between" style="margin-bottom:6px">
+            <strong>${seq.line.name}</strong>
+            <span style="font-weight:600;color:${st.netUtil>90?'var(--danger)':st.netUtil>75?'var(--warn)':'var(--sec)'}">${st.netUtil}%</span>
+          </div>
+          <div class="utilization-bar">
+            <div class="util-prod" style="width:${st.prodUtil}%;display:flex;align-items:center;justify-content:center;font-size:10px;color:white;font-weight:600">${st.prodUtil>10?'Prod '+st.prodUtil+'%':''}</div>
+            <div class="util-co" style="width:${st.coPct}%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600">${st.coPct>5?'C/O '+st.coPct+'%':''}</div>
+            <div class="util-idle" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--txtS)">${st.idlePct>5?'Idle '+st.idlePct+'%':''}</div>
+          </div>
+          ${st.netUtil>95?'<div class="alert alert-danger" style="margin-top:6px;padding:6px 12px;font-size:12px">&#9888; Sovraccarico! Necessario turno aggiuntivo.</div>':
+            st.netUtil>85?'<div class="alert alert-warn" style="margin-top:6px;padding:6px 12px;font-size:12px">&#9888; Poco margine per imprevisti.</div>':
+            '<div class="alert alert-ok" style="margin-top:6px;padding:6px 12px;font-size:12px">&#9989; Capacit&agrave; OK</div>'}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  // Sensitivity chart
+  const scenarios = [0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.5,1.8,2.0].map(mult => {
+    const sp = STATE.products.map(p => ({...p, demandMonth: Math.round(p.demandMonth * mult)}));
+    const opt = optimizeLots(sp, STATE.lines);
+    return {
+      label: `${mult>1?'+':''}${((mult-1)*100).toFixed(0)}%`,
+      holding: opt.reduce((s,p)=>s+p.annHolding,0),
+      setup: opt.reduce((s,p)=>s+p.annSetup,0),
+      total: opt.reduce((s,p)=>s+p.totalAnnCost,0),
+      co: opt.reduce((s,p)=>s+p.totalCOMonth,0),
+    };
+  });
+  destroyChart('sensitivity');
+  STATE.charts.sensitivity = new Chart($('chart-sensitivity'), {
+    type:'bar', data:{
+      labels: scenarios.map(s=>s.label),
+      datasets:[
+        { label:'Holding', data: scenarios.map(s=>s.holding), backgroundColor:'#3b82f640', borderColor:'#3b82f6', borderWidth:1, yAxisID:'y' },
+        { label:'Setup', data: scenarios.map(s=>s.setup), backgroundColor:'#fbbf2440', borderColor:'#fbbf24', borderWidth:1, yAxisID:'y' },
+        { type:'line', label:'Totale', data: scenarios.map(s=>s.total), borderColor:'#dc2626', borderWidth:2.5, pointRadius:4, fill:false, yAxisID:'y' },
+        { type:'line', label:'C/O (min/mese)', data: scenarios.map(s=>s.co), borderColor:'#7c3aed', borderWidth:1.5, borderDash:[5,5], pointRadius:3, fill:false, yAxisID:'y1' },
+      ]
+    }, options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{ y:{stacked:true, position:'left'}, y1:{position:'right', grid:{drawOnChartArea:false}} },
+      plugins:{legend:{position:'bottom'}}
+    }
+  });
+}
+
+function updateScenario(val) {
+  STATE.scenarioMultiplier = val;
+  render();
+}
+
+function saveScenario() {
+  const O = STATE.optimized;
+  STATE.savedScenario = {
+    mult: STATE.scenarioMultiplier,
+    totCost: O.reduce((s,p)=>s+p.totalAnnCost,0),
+    totCO: O.reduce((s,p)=>s+p.totalCOMonth,0),
+    avgDI: O.reduce((s,p)=>s+p.daysInv,0)/O.length,
+    totInv: O.reduce((s,p)=>s+p.avgInvCost,0),
+  };
+  render();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+render();
+</script>
+</body>
+</html>
